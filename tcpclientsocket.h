@@ -27,6 +27,8 @@
   #include <iostream>
 #endif
 
+#define SO_CONNECT_TIME 0x700C
+        
 class TCPClientSocket
 {
 public:
@@ -107,7 +109,7 @@ public:
     {
       long ConnectionTime;
       int Size = sizeof(ConnectionTime);
-      if (getsockopt(SocketId,SOL_SOCKET,0x700C,(char*)&ConnectionTime,&Size) == 0) /* SO_CONNECT_TIME */
+      if (getsockopt(SocketId,SOL_SOCKET,SO_CONNECT_TIME,(char*)&ConnectionTime,&Size) == 0)
         return (ConnectionTime != SOCKET_ERROR);
     }
     return false;
@@ -173,13 +175,25 @@ public:
     return 0;
   }
 
+  short ReceiveShort()
+  {
+    short Buffer;
+    if (ReceiveBytes(&Buffer,sizeof(short)) == sizeof(short))
+    {
+#if (defined DEBUG && DEBUG == 0)
+	std::cout << "Received short : " << ntohs(Buffer) << std::endl;
+#endif
+      return ntohs(Buffer);
+    }
+    return 0;
+  }
+
   char* ReceiveString()
   {
     unsigned long DataSize = ReceiveInteger();
-    char* Data = NULL;
     if (DataSize > 0)
     {
-      Data = new char[DataSize];
+      char* Data = new char[DataSize];
       memset(Data,sizeof(Data),0);
       if (ReceiveBytes(Data, DataSize) == DataSize)
       {
@@ -188,11 +202,39 @@ public:
 #endif
         return Data;
       }
+      delete[] Data;
     }
     return NULL;
   }
 
-  bool SendByte(const short Data)
+  WCHAR* ReceiveUTF8String()
+  {
+    unsigned long DataSize = ReceiveInteger();
+    if (DataSize > 0)
+    {
+      char* Data = new char[DataSize+1];
+      if (ReceiveBytes(Data, DataSize) == DataSize)
+      {
+        Data[DataSize] = '\0';
+#if (defined DEBUG && DEBUG == 0)
+	std::cout << "Received string : " << Data << std::endl;
+#endif
+        unsigned long Length = MultiByteToWideChar(CP_UTF8,0,Data,DataSize,NULL,0);
+        if (Length > 0)
+        {
+          WCHAR* Result = new WCHAR[Length+1];
+          if (MultiByteToWideChar(CP_UTF8,0,Data,DataSize,Result,Length) > 0)
+          {
+            Result[Length] = L'\0';
+            return Result;
+          }
+        }
+      }
+    }
+    return NULL;
+  }
+
+  bool SendByte(const char Data)
   {
     if (SendBytes((char*)&Data, sizeof(char)) == sizeof(char))
     {
@@ -207,10 +249,9 @@ public:
   unsigned long SendBytes(const void* Data, const unsigned long DataSize)
   {
     unsigned long SentSize = 0;
-    int Result = 0;
     while (SentSize < DataSize)
     {
-      Result = send(SocketId,(char*)Data+SentSize,DataSize-SentSize,0);
+      int Result = send(SocketId,(char*)Data+SentSize,DataSize-SentSize,0);
       if (Result == SOCKET_ERROR)
       {
         if (WSAGetLastError() != WSAEWOULDBLOCK)
@@ -235,6 +276,19 @@ public:
     return false;
   }
 
+  bool SendShort(const short Data)
+  {
+    short Buffer = htons(Data);
+    if (SendBytes((char*)&Buffer, sizeof(short)) == sizeof(short))
+    {
+#if (defined DEBUG && DEBUG == 0)
+	std::cout << "Sent short : " << Data << std::endl;
+#endif
+      return true;
+    }
+    return false;
+  }
+
   bool SendString(const char* Data)
   {
     unsigned long DataSize = strlen(Data)+1;
@@ -244,6 +298,23 @@ public:
   std::cout << "Sent string : " << Data << std::endl;
 #endif
       return true;
+    }
+    return false;
+  }
+
+  bool SendUTF8String(const WCHAR* Data)
+  {
+    unsigned long Length = WideCharToMultiByte(CP_UTF8,0,Data,-1,NULL,0,NULL,NULL);
+    if (Length > 0)
+    {
+      char* Buffer = new char[Length];
+      if (WideCharToMultiByte(CP_UTF8,0,Data,-1,Buffer,Length,NULL,NULL) > 0 && SendInteger(Length-1) && SendBytes(Buffer, Length-1) == Length-1)
+      {
+#if (defined DEBUG && DEBUG == 0)
+	std::cout << "Sent string : " << Buffer << std::endl;
+#endif
+        return true;
+      }
     }
     return false;
   }

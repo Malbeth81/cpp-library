@@ -81,14 +81,18 @@ inline void AddToLog(const char* LogFile, const char* String)
 
 inline WCHAR* AnsiToUnicode(const char* Str)
 {
-  if (Str == NULL)
+  if (Str != NULL)
   {
-    int Size = strlen(Str);
-    WCHAR* Result = new WCHAR[Size+1];
-    if (Size > 0)
-      MultiByteToWideChar(CP_ACP, 0, Str, Size, Result, Size);
-    Result[Size] = '\0';
-    return Result;
+    int Length = MultiByteToWideChar(CP_ACP, 0, Str, -1, 0, 0);
+    if (Length > 0)
+    {
+      WCHAR* Result = new WCHAR[Length+1];
+      if (MultiByteToWideChar(CP_ACP, 0, Str, -1, Result, Length) > 0)
+      {
+        Result[Length] = L'\0';
+        return Result;
+      }
+    }
   }
   return NULL;
 }
@@ -197,6 +201,18 @@ inline HWND FindPreviousInstance(const char* ClassName)
   if (EnumWindows((WNDENUMPROC)EnumWndProc, (LPARAM)ClassName))
     return PreviousInstance;
   return NULL;
+}
+
+inline unsigned long FileTimeToUnixTime(FILETIME* FileTime)
+{
+  return (((((unsigned long long)FileTime->dwHighDateTime) << 32) + FileTime->dwLowDateTime)-116444736000000000ULL)/10000000;
+}
+
+inline unsigned long FileTimeDiff(FILETIME* Time1, FILETIME* Time2)
+{
+  if (Time1 != NULL && Time2 != NULL && Time1 != Time2)
+    return FileTimeToUnixTime(Time1)-FileTimeToUnixTime(Time2);
+  return 0;
 }
 
 inline char* FormatDate(const SYSTEMTIME Time, const int Flag, const char* Format)
@@ -507,6 +523,26 @@ inline void SelectListBoxItem(const HWND hDlg, const int ControlID, const char* 
     SendDlgItemMessage(hDlg, ControlID, LB_SETCURSEL, Index, 0);
 }
 
+inline unsigned long SystemTimeToUnixTime(SYSTEMTIME* DateTime)
+{
+  FILETIME FileTime;
+  SystemTimeToFileTime(DateTime, &FileTime);
+  return FileTimeToUnixTime(&FileTime);
+}
+
+inline unsigned long SystemTimeDiff(SYSTEMTIME* Time1, SYSTEMTIME* Time2)
+{
+  if (Time1 != NULL && Time2 != NULL && Time1 != Time2)
+  {
+    FILETIME FileTime1;
+    FILETIME FileTime2;
+    SystemTimeToFileTime(Time1, &FileTime1);
+    SystemTimeToFileTime(Time2, &FileTime2);
+    return FileTimeDiff(&FileTime1, &FileTime2);
+  }
+  return 0;
+}
+
 inline SYSTEMTIME SystemTimeToLocalTime(const SYSTEMTIME* DateTime)
 {
   SYSTEMTIME Result = *DateTime;
@@ -523,16 +559,48 @@ inline SYSTEMTIME SystemTimeToLocalTime(const SYSTEMTIME* DateTime)
 
 inline char* UnicodeToAnsi(const WCHAR* Str)
 {
-  if (Str == NULL)
+  if (Str != NULL)
   {
-    int Size = lstrlenW(Str);
-    char* Result = new char[Size+1];
-    if (Size > 0)
-      WideCharToMultiByte(CP_ACP, 0, Str, Size, Result, Size, NULL, NULL);
-    Result[Size] = '\0';
-    return Result;
+    int Length = WideCharToMultiByte(CP_ACP, 0, Str, -1, 0, 0, NULL, NULL);
+    if (Length > 0)
+    {
+      char* Result = new char[Length+1];
+      if (WideCharToMultiByte(CP_ACP, 0, Str, -1, Result, Length, NULL, NULL) > 0)
+      {
+        Result[Length] = '\0';
+        return Result;
+      }
+    }
   }
   return NULL;
+}
+
+inline void UnixTimeToFileTime(const unsigned long Time, FILETIME* FileTime)
+{
+  unsigned long long Value = UInt32x32To64(Time,10000000)+116444736000000000ULL;
+  FileTime->dwLowDateTime = (DWORD) Value;
+  FileTime->dwHighDateTime = Value >> 32;
+}
+
+inline void UnixTimeToSystemTime(const unsigned long Time, SYSTEMTIME* DateTime)
+{
+  FILETIME FileTime;
+  UnixTimeToFileTime(Time, &FileTime);
+  FileTimeToSystemTime(&FileTime, DateTime);
+}
+
+inline WCHAR* UTF8ToUnicode(char* Buffer)
+{
+  int Length = MultiByteToWideChar(CP_UTF8,0,Buffer,-1,NULL,0);
+  if (Length > 0)
+  {
+    WCHAR* Result = new WCHAR[Length+1];
+    if (MultiByteToWideChar(CP_UTF8,0,Buffer,-1,Result,Length) > 0)
+    {
+      Result[Length] = L'\0';
+      return Result;
+    }
+  }
 }
 
 inline BOOL WritePrivateProfileBool(const char* Section, const char* Key, bool Value, const char* FileName)

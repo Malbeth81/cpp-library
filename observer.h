@@ -22,7 +22,9 @@
 #ifndef OBSERVER_H
 #define	OBSERVER_H
 
-class Observable;
+#include <algorithm>
+
+using namespace std;
 
 class Observer
 {
@@ -35,7 +37,7 @@ public:
   {
   }
 
-  virtual void Update(const Observable* object, int Event)
+  virtual void Notify(const int Event, const void* Param)
   {
   }
 };
@@ -46,7 +48,7 @@ public:
   Observable()
   {
     /* Initialize members */
-    Observers = 0;
+    Observers = NULL;
     ObserverCount = 0;
     UpdateCount = 0;
   }
@@ -54,22 +56,21 @@ public:
   ~Observable()
   {
     /* Clean up */
-    if (Observers != 0)
+    if (Observers != NULL)
       delete[] Observers;
   }
 
-  void AddObserver(Observer* object)
+  void AddObserver(Observer* Object)
   {
     /* Increase the size of the array */
-    Observer** Array = new Observer*[ObserverCount+1];
-    for (int i = 0; i < ObserverCount; i++)
-      Array[i] = Observers[i];
-    if (Observers != 0)
+    Observer** NewArray = new Observer*[ObserverCount+1];
+    copy(Observers, Observers+ObserverCount, NewArray);
+    if (Observers != NULL)
       delete[] Observers;
-    Observers = Array;
+    Observers = NewArray;
 
     /* Add new object */
-    Observers[ObserverCount] = object;
+    Observers[ObserverCount] = Object;
     ObserverCount++;
   }
 
@@ -83,20 +84,20 @@ public:
     UpdateCount--;
   }
 
-  void NotifyObservers(int Event)
+  void NotifyObservers(const int Event, const void* Param = NULL)
   {
     if (UpdateCount == 0)
     {
       /* Update all the objects in the array */
-      for (int i = 0; i < ObserverCount; i++)
-        Observers[i]->Update(this, Event);
+      for (unsigned int i = 0; i < ObserverCount; i++)
+        Observers[i]->Notify(Event, Param);
     }
   }
 
 private:
   Observer** Observers;
-  unsigned short ObserverCount;
-  unsigned short UpdateCount;
+  unsigned int ObserverCount;
+  unsigned int UpdateCount;
 };
 
 #endif

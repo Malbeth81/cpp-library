@@ -26,13 +26,91 @@
 #include <cstdlib>
 #include <cstring>
 #include <cwchar>
-
+/*
+inline int argcount(const char* Str)
+{
+  int Result = 0;
+  int i = 0;
+  while (i != -1 && i < (int)strlen(Str))
+  {
+    if (Str[i] == '"')
+    {
+      i = strpos(Str, "\"", i+1);
+      if (i != -1)
+        i ++;
+      Result ++;
+    }
+    else if (Str[i] == ' ')
+      i = strnpos(Str, " ", i);
+    else
+    {
+      i = strpos(Str, " ", i);
+      Result ++;
+    }
+  }
+  return Result;
+}
+*/
 /* Returns a string representation of an integer value */
 inline char* inttostr(const long Number)
 {
   char* Result = new char[12];
   itoa(Number, Result, 10);
   return Result;
+}
+
+inline wchar_t* inttowstr(const long Number)
+{
+  wchar_t* Result = new wchar_t[12];
+  _itow(Number, Result, 10);
+  return Result;
+}
+
+
+inline char* getline(const char* Str, unsigned int Line = 1)
+{
+  unsigned int Size = strlen(Str);
+  if (Size > 0 && Line > 0)
+  {
+    const char* LineBegin = Str;
+    for (unsigned int i = 0; i < Size-1; i++)
+      if (Str[i] == (char)13 || Str[i] == (char)10)
+      {
+        Line--;
+        if (Line == 0)
+          Size = i-(LineBegin-Str);
+        else
+          LineBegin = Str+i+1;
+      }
+    char* Result = new char[Size+1];
+    strncpy(Result,LineBegin,Size);
+    Result[Size] = '\0';
+    return Result;
+  }
+  return NULL;
+}
+
+inline wchar_t* getline(const wchar_t* Str, unsigned int Line = 1)
+{
+  unsigned int Size = wcslen(Str);
+  if (Size > 0 && Line > 0)
+  {
+    const wchar_t* LineBegin = Str;
+    for (unsigned int i = 0; i < Size-1; i++)
+      if (Str[i] == (wchar_t)13 || Str[i] == (wchar_t)10)
+      {
+        Line--;
+        if (Line == 0)
+          Size = i-(LineBegin-Str);
+        else
+          LineBegin = Str+i+1;
+      }
+    wchar_t* Result = new wchar_t[Size+1];
+    wcsncpy(Result,LineBegin,Size);
+    Result[Size] = '\0';
+    return Result;
+  }
+  return NULL;
 }
 
 /* Get the value of a parameter in a string */
@@ -467,5 +545,4 @@ inline wchar_t* utf8towchar(const char *String)
   Result[Size] = '\0';
   return Result;
 }
-
 #endif
