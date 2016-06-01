@@ -114,6 +114,7 @@ public:
       ioctlsocket(SocketId,FIONBIO,&Arg);
     }
   }
+
 protected:
   bool Blocking;
   SOCKET SocketId;

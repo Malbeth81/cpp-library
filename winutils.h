@@ -161,7 +161,7 @@ inline bool DirectoryExists(const char* dirName)
   DWORD result = GetFileAttributes(dirName);
   if (result == INVALID_FILE_ATTRIBUTES)
     return false;
-  return (result & FILE_ATTRIBUTE_DIRECTORY);
+  return (result & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
 inline HFONT EasyCreateFont(const HDC DC, const char* FontName, const int Size, const unsigned short Style)
@@ -203,6 +203,14 @@ inline HWND FindPreviousInstance(const char* ClassName)
   return NULL;
 }
 
+inline bool FileExists(const char* fileName)
+{
+  DWORD result = GetFileAttributes(fileName);
+  if (result == INVALID_FILE_ATTRIBUTES)
+    return false;
+  return (result & FILE_ATTRIBUTE_DIRECTORY) == 0;
+}
+
 inline unsigned long FileTimeToUnixTime(FILETIME* FileTime)
 {
   return (((((unsigned long long)FileTime->dwHighDateTime) << 32) + FileTime->dwLowDateTime)-116444736000000000ULL)/10000000;
@@ -215,11 +223,11 @@ inline unsigned long FileTimeDiff(FILETIME* Time1, FILETIME* Time2)
   return 0;
 }
 
-inline char* FormatDate(const SYSTEMTIME Time, const int Flag, const char* Format)
+inline char* FormatDate(const SYSTEMTIME* Time, const int Flag, const char* Format)
 {
   char* Result = new char[MAX_PATH];
   /* Format to string */
-  GetDateFormat(LOCALE_USER_DEFAULT, Flag, &Time, Format, Result, MAX_PATH);
+  GetDateFormat(LOCALE_USER_DEFAULT, Flag, Time, Format, Result, MAX_PATH);
   return Result;
 }
 
@@ -236,11 +244,11 @@ inline char* FormatDateTime(const SYSTEMTIME* DateTime, const int DateFlag, cons
   return Result;
 }
 
-inline char* FormatTime(const SYSTEMTIME Time, const int Flag, const char* Format)
+inline char* FormatTime(const SYSTEMTIME* Time, const int Flag, const char* Format)
 {
   char* Result = new char[12];
   /* Format to string */
-  GetTimeFormat(LOCALE_USER_DEFAULT, Flag, &Time, Format, Result, 12);
+  GetTimeFormat(LOCALE_USER_DEFAULT, Flag, Time, Format, Result, 12);
   return Result;
 }
 
@@ -424,6 +432,63 @@ inline bool IsMenuItemChecked(const HMENU hMenu, const UINT Id)
   return GetMenuState(hMenu, Id, MF_BYCOMMAND) & MF_CHECKED;
 }
 
+inline bool IsRunningAsApplication()
+{
+  bool result = false;
+
+#ifdef _WIN32_WINNT
+  HANDLE hToken = NULL;
+  if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken))
+  {
+    SID_IDENTIFIER_AUTHORITY Authority = {SECURITY_NT_AUTHORITY};
+
+    DWORD groupLength = 0;
+    PTOKEN_GROUPS groupInfo = NULL;
+    if (!GetTokenInformation(hToken, TokenGroups, groupInfo, groupLength, &groupLength) && GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+    {
+      groupInfo = (PTOKEN_GROUPS)LocalAlloc(0, groupLength);
+      if (groupInfo != NULL && GetTokenInformation(hToken, TokenGroups, groupInfo, groupLength, &groupLength))
+      {
+        PSID ServiceSid = NULL;
+        if (AllocateAndInitializeSid(&Authority, 1, SECURITY_INTERACTIVE_RID, 0, 0, 0, 0, 0, 0, 0, &ServiceSid))
+        {
+          for (unsigned int i = 0; i < groupInfo->GroupCount; i += 1)
+          {
+              if (EqualSid(groupInfo->Groups[i].Sid, ServiceSid))
+              {
+                  result = true;
+                  break;
+              }
+          }
+          FreeSid(ServiceSid);
+        }
+      }
+      LocalFree(groupInfo);
+    }
+    CloseHandle(hToken);
+  }
+#endif
+
+  return result;
+}
+
+/*
+BOOL IsUserInteractive()
+{
+   BOOL bIsUserInteractive = TRUE;
+
+   HWINSTA hWinStation = GetProcessWindowStation();
+   if (hWinStation != NULL)
+   {
+     USEROBJECTFLAGS uof = {0};
+     if (GetUserObjectInformation(hWinStation, UOI_FLAGS, &uof, sizeof(USEROBJECTFLAGS), NULL) && ((uof.dwFlags & WSF_VISIBLE) == 0))
+     {
+       bIsUserInteractive = FALSE;
+     }
+   }
+   return bIsUserInteractive;
+}
+*/
 inline SYSTEMTIME LocalTimeToSystemTime(const SYSTEMTIME DateTime)
 {
   SYSTEMTIME Result = DateTime;

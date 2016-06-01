@@ -209,7 +209,7 @@ uint32_t        initval)         /* the previous hash, or an arbitrary value */
 /*
 --------------------------------------------------------------------
 hashword2() -- same as hashword(), but take two seeds and return two
-32-bit values.  pc and pb must both be nonnull, and *pc and *pb must
+32-bit values.  pc and pb must both be non null, and *pc and *pb must
 both be initialized with seeds.  If you pass in (*pb)==0, the output
 (*pc) will be the same as the return value from hashword().
 --------------------------------------------------------------------

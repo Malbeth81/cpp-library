@@ -135,16 +135,18 @@ public:
   unsigned long ReceiveBytes(const void* Data, const unsigned long DataSize)
   {
     unsigned long ReceivedSize = 0;
-    while (ReceivedSize < DataSize)
+    if (Data != NULL && DataSize > 0)
     {
-      int Result = recv(SocketId,(char*)Data+ReceivedSize,DataSize-ReceivedSize,0);
-      if (Result == 0 || Result == SOCKET_ERROR)
+      while (ReceivedSize < DataSize)
       {
-        if (WSAGetLastError() != WSAEWOULDBLOCK)
+        int Result = recv(SocketId,(char*)Data+ReceivedSize,DataSize-ReceivedSize,0);
+        if (Result == 0 || (Result == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK))
+        {
           Close();
-        break;
+          break;
+        }
+        ReceivedSize += Result;
       }
-      ReceivedSize += Result;
     }
     return ReceivedSize;
   }
@@ -152,16 +154,18 @@ public:
   unsigned long ReceiveBytes(const void* Buffer, const unsigned long BufferSize, const void* Delimiter, const unsigned long DelimiterSize)
   {
     unsigned long ReceivedSize = 0;
-    while (ReceivedSize < BufferSize && (ReceivedSize < DelimiterSize || memcmp((char*)Buffer+ReceivedSize-DelimiterSize,Delimiter,DelimiterSize) != 0))
+    if (Buffer != NULL && BufferSize > 0 && Delimiter != NULL && DelimiterSize > 0)
     {
-      int Result = recv(SocketId,(char*)Buffer+ReceivedSize,1,0);
-      if (Result == 0 || Result == SOCKET_ERROR)
+      while (ReceivedSize < BufferSize && (ReceivedSize < DelimiterSize || memcmp((char*)Buffer+ReceivedSize-DelimiterSize,Delimiter,DelimiterSize) != 0))
       {
-        if (WSAGetLastError() != WSAEWOULDBLOCK)
+        int Result = recv(SocketId,(char*)Buffer+ReceivedSize,1,0);
+        if (Result == 0 || (Result == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK))
+        {
           Close();
-        break;
+          break;
+        }
+        ReceivedSize += Result;
       }
-      ReceivedSize += Result;
     }
     return ReceivedSize;
   }
@@ -253,16 +257,18 @@ public:
   unsigned long SendBytes(const void* Data, const unsigned long DataSize)
   {
     unsigned long SentSize = 0;
-    while (SentSize < DataSize)
+    if (Data != NULL && DataSize > 0)
     {
-      int Result = send(SocketId,(char*)Data+SentSize,DataSize-SentSize,0);
-      if (Result == SOCKET_ERROR)
+      while (SentSize < DataSize)
       {
-        if (WSAGetLastError() != WSAEWOULDBLOCK)
+        int Result = send(SocketId,(char*)Data+SentSize,DataSize-SentSize,0);
+        if (Result == 0 || (Result == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK))
+        {
           Close();
-        break;
+          break;
+        }
+        SentSize += Result;
       }
-      SentSize += Result;
     }
     return SentSize;
   }

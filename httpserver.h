@@ -98,29 +98,38 @@ public:
   {
     hServerThread = NULL;
     RequestHandlerProc = RequestHandler;
+    Socket = NULL;
   }
 
   ~HTTPServer()
   {
     Close();
+
+    /* Clean up */
+    delete Socket;
   }
 
   bool Close()
   {
-    if (Socket.IsOpened())
+    if (Socket != NULL && Socket->IsOpened())
     {
       /* Close the server socket */
-      return Socket.Close();
+      return Socket->Close();
     }
     return false;
   }
 
   bool Open(const int Port)
   {
-    if (!Socket.IsOpened())
+    if (Socket == NULL || !Socket->IsOpened())
     {
       /* Create a server socket that listens for connections */
-      Socket.Open(Port);
+      if (Socket == NULL)
+      {
+        Socket = new TCPServerSocket;
+        Socket->SetBlocking(false);
+      }
+      Socket->Open(Port);
 
       unsigned long ThreadId;
       /* Start the threads */
@@ -135,7 +144,7 @@ public:
 private:
   REQUESTHANDLERPROC RequestHandlerProc;
   HANDLE hServerThread;
-  TCPServerSocket Socket;
+  TCPServerSocket* Socket;
 
   static void ParseMultiPartFormData(HTTPRequest* Request, const char* Content, const unsigned int ContentSize, const char* Boundary, const char* Name = NULL)
   {
@@ -534,10 +543,10 @@ private:
   static unsigned long __stdcall ServerThread(void* arg)
   {
     HTTPServer* Server = (HTTPServer*)arg;
-    while (Server->Socket.IsOpened())
+    while (Server->Socket != NULL && Server->Socket->IsOpened())
     {
-      /* Accept a client socket's connection request */
-      SOCKET SocketId = Server->Socket.Accept();
+      /* Accept the next connection request */
+      SOCKET SocketId = Server->Socket->Accept();
       if (SocketId != INVALID_SOCKET)
       {
         /* Prepare thread data */
@@ -558,11 +567,10 @@ private:
       else
       {
         int Error = WSAGetLastError();
-        if (Error != WSAEWOULDBLOCK && Error != WSAETIMEDOUT)
-          return Error;
+        if (Error != WSAEWOULDBLOCK)
+          break;
       }
-      /* Wait before trying again */
-      Sleep(25);
+      Sleep(50);
     }
     return 0;
   }

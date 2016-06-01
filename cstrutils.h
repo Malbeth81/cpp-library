@@ -164,7 +164,7 @@ inline char* getvalue(const char* String, const char* Name, const char* Separato
         String += strlen(Name);
         /* Skip whitespace */
         String += strspn(String," ");
-        if (strcmp(String,Separator) == 0)
+        if (strncmp(String,Separator,strlen(Separator)) == 0)
         {
           /* Skip the separator */
           String += strlen(Separator);
@@ -172,7 +172,7 @@ inline char* getvalue(const char* String, const char* Name, const char* Separato
           String += strspn(String," ");
           /* Get the value size */
           int Size = 0;
-          if (strcmp(String+strlen(Separator),"\"") == 0)
+          if (strcmp(String,"\"") == 0)
           {
             /* Skip the quote */
             String++;
@@ -183,6 +183,7 @@ inline char* getvalue(const char* String, const char* Name, const char* Separato
           /* Extract the value */
           char* Result = new char[Size+1];
           strncpy(Result,String,Size);
+          Result[Size] = '\0';
           return Result;
         }
       }
