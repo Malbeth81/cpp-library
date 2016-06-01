@@ -44,7 +44,7 @@ static PFNOPENTHEMEDATA zOpenThemeData = (PFNOPENTHEMEDATA)GetProcAddress(hTheme
 static PFNDRAWTHEMEBACKGROUND zDrawThemeBackground = (PFNDRAWTHEMEBACKGROUND)GetProcAddress(hThemesModule, "DrawThemeBackground");
 static PFNDRAWTHEMEPARENTBACKGROUND zDrawThemeParentBackground = (PFNDRAWTHEMEPARENTBACKGROUND)GetProcAddress(hThemesModule, "DrawThemeParentBackground");
 static PFNCLOSETHEMEDATA zCloseThemeData = (PFNCLOSETHEMEDATA)GetProcAddress(hThemesModule, "CloseThemeData");
-static PFNGETTHEMEBACKGROUNDCONTENTRECT zGetThemeBackgroundContentRect = (PFNGETTHEMEBACKGROUNDCONTENTRECT)GetProcAddress(hThemesModule, "GetThemeBackgroundContentRect");
+//static PFNGETTHEMEBACKGROUNDCONTENTRECT zGetThemeBackgroundContentRect = (PFNGETTHEMEBACKGROUNDCONTENTRECT)GetProcAddress(hThemesModule, "GetThemeBackgroundContentRect");
 
 // PUBLIC FUNCTIONS ------------------------------------------------------------
 

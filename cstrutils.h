@@ -23,9 +23,11 @@
 #define CSTRUTILS_H_
 
 #include <cctype>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <cwchar>
+
 /*
 inline int argcount(const char* Str)
 {
@@ -66,6 +68,40 @@ inline wchar_t* inttowstr(const long Number)
   return Result;
 }
 
+/* Return the entire file content */
+inline char* getFileContent(const char* Filename)
+{
+  char* Buffer = NULL;
+  FILE* File = fopen(Filename,"rb");
+  if (File != NULL)
+  {
+    fseek(File, 0, SEEK_END);
+    long FileSize = ftell(File);
+    Buffer = (char*)malloc(FileSize+1);
+    if (Buffer != NULL)
+    {
+      fseek(File, 0, SEEK_SET);
+      fread(Buffer, FileSize, 1, File);
+      Buffer[FileSize] = '\0';
+    }
+    fclose(File);
+  }
+  return Buffer;
+}
+
+/* Return the size of the file */
+inline unsigned long getFileSize(const char* Filename)
+{
+  unsigned long FileSize = 0;
+  FILE* File = fopen(Filename,"rb");
+  if (File != NULL)
+  {
+    fseek(File, 0, SEEK_END);
+    FileSize = ftell(File);
+    fclose(File);
+  }
+  return FileSize;
+}
 
 inline char* getline(const char* Str, unsigned int Line = 1)
 {

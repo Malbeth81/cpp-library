@@ -111,6 +111,25 @@ inline void findreplace(string& String, map<string,string> Values)
   }
 }
 
+inline string GetFileName(string Filename)
+{
+  unsigned int Start = Filename.find_last_of("/\\");
+  unsigned int End = Filename.find_last_of(".");
+  if (Start == string::npos)
+    Start = 0;
+  if (End == string::npos)
+    End = Filename.length();
+  return Filename.substr(Start+1, End-Start-1);
+}
+
+inline string GetFileExtension(string Filename)
+{
+  unsigned int Pos = Filename.find_last_of('.');
+  if (Pos != string::npos)
+    return Filename.substr(Pos+1);
+  return "";
+}
+
 inline string GetPrivateProfileString(const string Section, const string Key, const string Default, const string FileName)
 {
   string Result;

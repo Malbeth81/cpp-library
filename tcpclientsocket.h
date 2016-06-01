@@ -98,6 +98,17 @@ public:
     return Connect(StringToAddress(Address), Port);
   }
 
+  long GetConnectionTime()
+  {
+    long Result = SOCKET_ERROR;
+    if (SocketId != INVALID_SOCKET)
+    {
+      int Size = sizeof(Result);
+      getsockopt(SocketId,SOL_SOCKET,SO_CONNECT_TIME,(char*)&Result,&Size);
+    }
+    return Result;
+  }
+
   bool IsBlocking()
   {
     return Blocking;
@@ -105,17 +116,10 @@ public:
 
   bool IsConnected()
   {
-    if (SocketId != INVALID_SOCKET)
-    {
-      long ConnectionTime;
-      int Size = sizeof(ConnectionTime);
-      if (getsockopt(SocketId,SOL_SOCKET,SO_CONNECT_TIME,(char*)&ConnectionTime,&Size) == 0)
-        return (ConnectionTime != SOCKET_ERROR);
-    }
-    return false;
+    return (GetConnectionTime() != SOCKET_ERROR);
   }
 
-  short ReceiveByte()
+  short ReceiveByte(short defaultValue = -1)
   {
     char Buffer;
     if (ReceiveBytes(&Buffer,sizeof(char)) == sizeof(char))
@@ -125,7 +129,7 @@ public:
 #endif
       return (short)Buffer;
     }
-    return 0;
+    return defaultValue;
   }
 
   unsigned long ReceiveBytes(const void* Data, const unsigned long DataSize)
@@ -162,7 +166,7 @@ public:
     return ReceivedSize;
   }
 
-  long ReceiveInteger()
+  long ReceiveInteger(long defaultValue = -1)
   {
     long Buffer;
     if (ReceiveBytes(&Buffer,sizeof(long)) == sizeof(long))
@@ -172,10 +176,10 @@ public:
 #endif
       return ntohl(Buffer);
     }
-    return 0;
+    return defaultValue;
   }
 
-  short ReceiveShort()
+  short ReceiveShort(short defaultValue = -1)
   {
     short Buffer;
     if (ReceiveBytes(&Buffer,sizeof(short)) == sizeof(short))
@@ -185,7 +189,7 @@ public:
 #endif
       return ntohs(Buffer);
     }
-    return 0;
+    return defaultValue;
   }
 
   char* ReceiveString()

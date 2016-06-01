@@ -37,9 +37,7 @@ public:
   {
   }
 
-  virtual void Notify(const int Event, const void* Param)
-  {
-  }
+  virtual void Notify(const int Event, const void* Param) = 0;
 };
 
 class Observable
@@ -82,6 +80,18 @@ public:
   void EndUpdate()
   {
     UpdateCount--;
+  }
+
+  Observer* GetObserver(unsigned int Index)
+  {
+    if (Index < ObserverCount)
+      return Observers[Index];
+    return NULL;
+  }
+
+  unsigned int GetObserverCount()
+  {
+    return ObserverCount;
   }
 
   void NotifyObservers(const int Event, const void* Param = NULL)

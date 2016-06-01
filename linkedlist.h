@@ -26,9 +26,6 @@
   #define NULL 0
 #endif
 
-/* Method to compare DataTypes, return -1 if B < A, 1 if B > A and 0 if equal */
-typedef int (__stdcall *COMPARATOR)(void* A, void* B);
-
 template <typename DataType>
 struct ListNode
 {
@@ -41,6 +38,8 @@ template <typename DataType>
 class LinkedList
 {
 public:
+  typedef int (__stdcall *COMPARATOR)(DataType* A, DataType* B); /* if (B < A) return -1; else if (B > A) return 1; else return 0; */
+
   LinkedList()
   {
     Current = NULL;
@@ -189,9 +188,7 @@ public:
       while (Ptr != NULL)
       {
         ListNode<DataType>* Next = Ptr->Next;
-        if (Next != NULL &&
-           ((Descending && (*Comparator)(Next->Data, Ptr->Data) < 0) ||
-           (!Descending && (*Comparator)(Next->Data, Ptr->Data) > 0)))
+        if (Next != NULL && ((Descending && (*Comparator)(Ptr->Data, Next->Data) > 0) || (!Descending && (*Comparator)(Ptr->Data, Next->Data) < 0)))
         {
           /* Swap Next with Ptr (place Next before Ptr instead of after) */
           if (Ptr->Prev != NULL)

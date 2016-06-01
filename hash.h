@@ -21,67 +21,111 @@
 */
 #ifndef HASH_H_
 #define HASH_H_
-
-#include <stdint.h>
-#include <stdlib.h>
-
-#undef get16bits
-#if (defined(__GNUC__) && defined(__i386__)) || defined(__WATCOMC__) \
-  || defined(_MSC_VER) || defined (__BORLANDC__) || defined (__TURBOC__)
-#define get16bits(d) (*((const uint16_t *) (d)))
-#else
-#define get16bits(d) ((((uint32_t)(((const uint8_t *)(d))[1])) << 8)\
-                       +(uint32_t)(((const uint8_t *)(d))[0]) )
-#endif
-
-inline uint32_t SuperFastHash(const char* data, int len)
+/*
+inline unsigned int VerySimpleHash(const char* data, int len)
 {
-  uint32_t hash = len;
-  uint32_t tmp;
+  const int p = 16777619;
+  unsigned int hash = 2166136261U;
 
-  if (len <= 0 || data == NULL) 
-    return 0;
+  for (int i = 0; i < len; i++)
+    hash = (hash ^ data[i])*p;
 
-  int rem = len & 3;
-  len >>= 2;
-
-  /* Main loop */
-  for (;len > 0; len--) 
-  {
-    hash  += get16bits (data);
-    tmp    = (get16bits (data+2) << 11) ^ hash;
-    hash   = (hash << 16) ^ tmp;
-    data  += 2*sizeof (uint16_t);
-    hash  += hash >> 11;
-  }
-
-  /* Handle end cases */
-  switch (rem) 
-  {
-    case 3: hash += get16bits (data);
-            hash ^= hash << 16;
-            hash ^= data[sizeof (uint16_t)] << 18;
-            hash += hash >> 11;
-            break;
-    case 2: hash += get16bits (data);
-            hash ^= hash << 11;
-            hash += hash >> 17;
-            break;
-    case 1: hash += *data;
-            hash ^= hash << 10;
-            hash += hash >> 1;
-            break;
-  }
-
-  /* Force "avalanching" of final 127 bits */
-  hash ^= hash << 3;
-  hash += hash >> 5;
-  hash ^= hash << 4;
-  hash += hash >> 17;
-  hash ^= hash << 25;
-  hash += hash >> 6;
-
+  hash += hash << 13;
+  hash ^= hash >> 7;
+  hash += hash << 3;
+  hash ^= hash >> 17;
+  hash += hash << 5;
   return hash;
+}
+*/
+
+/*
+ * http://burtleburtle.net/bob/hash/doobs.html
+ */
+
+/*
+--------------------------------------------------------------------
+mix -- mix 3 32-bit values reversibly.
+For every delta with one or two bits set, and the deltas of all three
+  high bits or all three low bits, whether the original value of a,b,c
+  is almost all zero or is uniformly distributed,
+* If mix() is run forward or backward, at least 32 bits in a,b,c
+  have at least 1/4 probability of changing.
+* If mix() is run forward, every bit of c will change between 1/3 and
+  2/3 of the time.  (Well, 22/100 and 78/100 for some 2-bit deltas.)
+--------------------------------------------------------------------
+*/
+#define mix(a,b,c) \
+{ \
+  a -= b; a -= c; a ^= (c>>13); \
+  b -= c; b -= a; b ^= (a<<8); \
+  c -= a; c -= b; c ^= (b>>13); \
+  a -= b; a -= c; a ^= (c>>12);  \
+  b -= c; b -= a; b ^= (a<<16); \
+  c -= a; c -= b; c ^= (b>>5); \
+  a -= b; a -= c; a ^= (c>>3);  \
+  b -= c; b -= a; b ^= (a<<10); \
+  c -= a; c -= b; c ^= (b>>15); \
+}
+
+/*
+--------------------------------------------------------------------
+hash() -- hash a variable-length key into a 32-bit value
+  data       : the key (the unaligned variable-length array of bytes)
+  len     : the length of the key, counting by bytes
+  initval : can be any 4-byte value
+Returns a 32-bit value.  Every bit of the key affects every bit of
+the return value.  Every 1-bit and 2-bit delta achieves avalanche.
+About 6*len+35 instructions.
+
+If you are hashing n strings (ub1 **)k, do it like this:
+  for (i=0, h=0; i<n; ++i)
+    h = hash(k[i], len[i], h);
+
+By Bob Jenkins, 1996. bob_jenkins@burtleburtle.net. You may use this
+code any way you wish, private, educational, or commercial.  It's free.
+
+See http://burtleburtle.net/bob/hash/evahash.html
+Use for hash table lookup, or anything where one collision in 2^^32 is
+acceptable.  Do NOT use for cryptographic purposes.
+--------------------------------------------------------------------
+*/
+inline unsigned int ComputeHash(const char* data, unsigned int length, unsigned int initval = 0)
+{
+  /* Set up the internal state */
+  unsigned int a = 0x9e3779b9;
+  unsigned int b = 0x9e3779b9;  /* the golden ratio; an arbitrary value */
+  unsigned int c = initval;
+
+  /* handle most of the key */
+  while (length >= 12)
+  {
+    a += (data[0] +((unsigned int)data[1]<<8)+((unsigned int)data[2]<<16)+((unsigned int)data[3]<<24));
+    b += (data[4] +((unsigned int)data[5]<<8)+((unsigned int)data[6]<<16)+((unsigned int)data[7]<<24));
+    c += (data[8] +((unsigned int)data[9]<<8)+((unsigned int)data[10]<<16)+((unsigned int)data[11]<<24));
+    mix(a,b,c);
+    data += 12;
+    length -= 12;
+  }
+
+  /* handle the last 11 bytes */
+  c += length;
+  switch(length) /* all the case statements fall through */
+  {
+  case 11: c+=((unsigned int)data[10]<<24);
+  case 10: c+=((unsigned int)data[9]<<16);
+  case 9 : c+=((unsigned int)data[8]<<8); /* the first byte of c is reserved for the length */
+  case 8 : b+=((unsigned int)data[7]<<24);
+  case 7 : b+=((unsigned int)data[6]<<16);
+  case 6 : b+=((unsigned int)data[5]<<8);
+  case 5 : b+=data[4];
+  case 4 : a+=((unsigned int)data[3]<<24);
+  case 3 : a+=((unsigned int)data[2]<<16);
+  case 2 : a+=((unsigned int)data[1]<<8);
+  case 1 : a+=data[0];
+  }
+  mix(a,b,c);
+  return c;
 }
 
 #endif

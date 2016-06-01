@@ -1,9 +1,9 @@
 /*
 * HTTPServer.h - A class to embed an HTTP server inside an application
 *
-* v 1.0
+* v 1.1
 *
-* Copyright (C) 2009-2010 Marc-André Lamothe.
+* Copyright (C) 2009-2011 Marc-André Lamothe.
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -70,23 +70,34 @@ struct HTTPBinaryResponse : HTTPResponse
   unsigned long ContentSize;
 };
 
-struct HTTPHTMLResponse : HTTPResponse
+struct HTTPImageResponse : HTTPResponse
+{
+  map<string, string> Headers;
+  string Status;
+  void* Content;
+  unsigned long ContentSize;
+};
+
+struct HTTPTextResponse : HTTPResponse
 {
   map<string, string> Headers;
   string Status;
   string Content;
 };
 
+static const char LineBreak[3] = {(char)13,(char)10,(char)0};
+static const long Delimiter = MAKELONG(MAKEWORD(13,10),MAKEWORD(13,10));
+
 typedef HTTPResponse* (__stdcall *REQUESTHANDLERPROC)(HTTPRequest* Request);
 
 class HTTPServer
 {
 public:
-  REQUESTHANDLERPROC RequestHandlerProc;
 
-  HTTPServer()
+  HTTPServer(REQUESTHANDLERPROC RequestHandler)
   {
     hServerThread = NULL;
+    RequestHandlerProc = RequestHandler;
   }
 
   ~HTTPServer()
@@ -122,8 +133,7 @@ public:
   }
 
 private:
-  static long Delimiter;
-  static char LineBreak[3];
+  REQUESTHANDLERPROC RequestHandlerProc;
   HANDLE hServerThread;
   TCPServerSocket Socket;
 
@@ -365,41 +375,79 @@ private:
 
   static bool SendResponse(TCPClientSocket* Socket, HTTPResponse* Response)
   {
-    if (Response->Size == sizeof(HTTPBinaryResponse))
+    if (Response == NULL)
+    {
+      char* Buffer = new char[BUFFER_SIZE+1];
+      strcpy(Buffer, "HTTP/1.1 404 Not Found");
+      strcat(Buffer, LineBreak);
+      Socket->SendBytes(Buffer, strlen(Buffer));
+      Socket->SendBytes(LineBreak, strlen(LineBreak));
+      delete[] Buffer;
+      return true;
+    }
+    else if (Response->Size == sizeof(HTTPBinaryResponse))
     {
       Socket->SendBytes(((HTTPBinaryResponse*)Response)->Content, ((HTTPBinaryResponse*)Response)->ContentSize);
       return true;
     }
-    else if (Response->Size == sizeof(HTTPHTMLResponse))
+    else if (Response->Size == sizeof(HTTPImageResponse))
     {
-      HTTPHTMLResponse* Response2 = (HTTPHTMLResponse*)Response;
-      char* Data = new char[BUFFER_SIZE+1];
+      HTTPImageResponse* ImageResponse = (HTTPImageResponse*)Response;
+      char* Buffer = new char[BUFFER_SIZE+1];
       /* Send response */
-      strcpy(Data, "HTTP/1.1 ");
-      if (Response2 == NULL)
-        strcat(Data, "404 Not Found");
-      else if (Response2->Status.length() > 0)
-        strcat(Data, Response2->Status.c_str());
+      strcpy(Buffer, "HTTP/1.1 ");
+      if (ImageResponse->Status.length() > 0)
+        strcat(Buffer, ImageResponse->Status.c_str());
       else
-        strcat(Data, "200 OK");
-      strcat(Data, LineBreak);
-      Socket->SendBytes(Data, strlen(Data));
+        strcat(Buffer, "200 OK");
+      strcat(Buffer, LineBreak);
+      Socket->SendBytes(Buffer, strlen(Buffer));
+      /* Prepare headers */
+      char* Str = inttostr(ImageResponse->ContentSize);
+      ImageResponse->Headers["Content-Length"] = Str;
+      delete[] Str;
       /* Send header */
-      if (Response2 != NULL)
-        for (map<string,string>::iterator it = Response2->Headers.begin() ; it != Response2->Headers.end(); it++)
-        {
-          strcpy(Data, it->first.c_str());
-          strcat(Data, ": ");
-          strcat(Data, it->second.c_str());
-          strcat(Data, LineBreak);
-          Socket->SendBytes(Data, strlen(Data));
-        }
+      for (map<string,string>::iterator it = ImageResponse->Headers.begin() ; it != ImageResponse->Headers.end(); it++)
+      {
+        strcpy(Buffer, it->first.c_str());
+        strcat(Buffer, ": ");
+        strcat(Buffer, it->second.c_str());
+        strcat(Buffer, LineBreak);
+        Socket->SendBytes(Buffer, strlen(Buffer));
+      }
       /* Send content */
       Socket->SendBytes(LineBreak, strlen(LineBreak));
-      if (Response2 != NULL)
-        Socket->SendBytes(Response2->Content.c_str(), Response2->Content.length());
+      Socket->SendBytes(ImageResponse->Content, ImageResponse->ContentSize);
       /* Cleanup */
-      delete[] Data;
+      delete[] Buffer;
+      return true;
+    }
+    else if (Response->Size == sizeof(HTTPTextResponse))
+    {
+      HTTPTextResponse* HTMLResponse = (HTTPTextResponse*)Response;
+      char* Buffer = new char[BUFFER_SIZE+1];
+      /* Send response */
+      strcpy(Buffer, "HTTP/1.1 ");
+      if (HTMLResponse->Status.length() > 0)
+        strcat(Buffer, HTMLResponse->Status.c_str());
+      else
+        strcat(Buffer, "200 OK");
+      strcat(Buffer, LineBreak);
+      Socket->SendBytes(Buffer, strlen(Buffer));
+      /* Send header */
+      for (map<string,string>::iterator it = HTMLResponse->Headers.begin() ; it != HTMLResponse->Headers.end(); it++)
+      {
+        strcpy(Buffer, it->first.c_str());
+        strcat(Buffer, ": ");
+        strcat(Buffer, it->second.c_str());
+        strcat(Buffer, LineBreak);
+        Socket->SendBytes(Buffer, strlen(Buffer));
+      }
+      /* Send content */
+      Socket->SendBytes(LineBreak, strlen(LineBreak));
+      Socket->SendBytes(HTMLResponse->Content.c_str(), HTMLResponse->Content.length());
+      /* Cleanup */
+      delete[] Buffer;
       return true;
     }
     return false;
@@ -436,9 +484,9 @@ private:
         /* Prepare a response */
         if (Request->Method == HTTP_UNKNOWN)
         {
-          Response = new HTTPHTMLResponse();
-          Response->Size = sizeof(HTTPHTMLResponse);
-          ((HTTPHTMLResponse*)Response)->Status = "501 Not Implemented";
+          Response = new HTTPTextResponse();
+          Response->Size = sizeof(HTTPTextResponse);
+          ((HTTPTextResponse*)Response)->Status = "501 Not Implemented";
         }
         else if (ConnectionInfo->Server->RequestHandlerProc != NULL)
             Response = (*ConnectionInfo->Server->RequestHandlerProc)(Request);
@@ -448,9 +496,9 @@ private:
       }
       catch (...)
       {
-        Response = new HTTPHTMLResponse();
-        Response->Size = sizeof(HTTPHTMLResponse);
-        ((HTTPHTMLResponse*)Response)->Status = "500 Internal Server Error";
+        Response = new HTTPTextResponse();
+        Response->Size = sizeof(HTTPTextResponse);
+        ((HTTPTextResponse*)Response)->Status = "500 Internal Server Error";
       }
       /* Send the response */
       if (Response != NULL)
@@ -462,8 +510,15 @@ private:
           free(((HTTPBinaryResponse*)Response)->Content);
           delete (HTTPBinaryResponse*)Response;
         }
-        else if (Response->Size == sizeof(HTTPHTMLResponse))
-          delete (HTTPHTMLResponse*)Response;
+        else if (Response->Size == sizeof(HTTPImageResponse))
+        {
+          free(((HTTPImageResponse*)Response)->Content);
+          delete (HTTPImageResponse*)Response;
+        }
+        else if (Response->Size == sizeof(HTTPTextResponse))
+        {
+          delete (HTTPTextResponse*)Response;
+        }
       }
       delete Socket;
       delete ConnectionInfo;
@@ -513,7 +568,5 @@ private:
   }
 
 };
-char HTTPServer::LineBreak[3] = {(char)13,(char)10,(char)0};
-long HTTPServer::Delimiter = MAKELONG(MAKEWORD(13,10),MAKEWORD(13,10));
 
 #endif
